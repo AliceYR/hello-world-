@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>翻译</title>
+    <link rel="stylesheet" href="./bower_components/bootstrap/dist/css/bootstrap.min.css">
+    <style type="text/css">
+    .englishText {
+        color: white;
+        background-color: #FF9000;
+    }
+    
+    .chineseText {
+        color: black;
+        background-color: #ADD4D5;
+        margin-bottom: 10px;
+    }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="row">
+            <div class="col-md-5">
+                <textarea name="" id="originText" cols="30" rows="100" style="width:100%;font-size: 20px;"></textarea>
+            </div>
+            <div class="col-md-2">
+                <button type="button" id="translateBtn" class="btn btn-default">翻译</button>
+            </div>
+            <div class="col-md-5">
+                <div class="outputContainer">
+                   <!--显示翻译结果的container -->
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+<script type="text/javascript" src="./bower_components/jquery/dist/jquery.min.js"></script>
+<script type="text/javascript" src="./bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
+<script src="./md5.js"></script>
+<script type="text/javascript">
+
+var bigInt = 10000000;
+var sentencesCount = 0;
+var sentences = [];
+var marks = ["?", ".", "！", "？", "。", "！"];
+var originText = "";
+
+
+$("#translateBtn").on("click", function() {
+    //清空输出结果的div
+	$(".outputContainer").empty();
+    sentencesCount = 0;
+    //分拆句子，这是最重要的函数，把英文文章拆分成句子，然后放到sentences数组内；
+    splitWords();
+    //逐句翻译。调用的是百度的api。
+    translate();
+});
+
+//这个函数最关键，当前实现很差，欢迎重构或重新设计。
+function splitWords() {
+    sentences = [];//存放拆分后句子的数组，先清空；
+    originText = $("#originText").val();//获取需要翻译的文章。
+    //解释一下我现在的实现逻辑：分别算出marks数组内的标记在文章中的位置，把排在最前面的最为分句的位置。
+    //尽管这样存在漏洞，因为只是我随便写写的小工具，我个人是够用了，比较矬，捂脸...
+    while (originText != "") {
+        var end = bigInt;
+        for (var i = 0; i < marks.length; i++) {
+            var tmpEnd = originText.indexOf(marks[i]);
+            if (tmpEnd != -1 && tmpEnd < end) {
+                var nextC = originText.charAt(tmpEnd+1);
+                end = tmpEnd;
+            }
+        }
+        var offset = 1;
+        while(1){
+            var nextChar = originText.charAt(end+offset);
+            if(nextChar==" "|| nextChar=="" || nextChar=="\n"|| nextChar=="\r"){
+                break;
+            }
+            else {
+                offset++;
+            }
+        }
+        
+        var sentence = originText.substr(0, end + offset);
+        originText = originText.substr(end + offset);
+        if (sentence.charAt(0) == " ") {
+            sentence = sentence.substr(1);
+        }
+        sentences.push(sentence);
+    }
+
+    console.log(sentences);
+}
+
+// 逐句翻译
+function translate() {
+    var appid = '20160316000015736';
+    var key = 'NaHY3H9G4eMEYHvB88b0';
+    var salt = (new Date).getTime();
+    var query = sentences[sentencesCount];
+    // 多个query可以用\n连接  如 query='apple\norange\nbanana\npear'
+    var from = 'en';
+    var to = 'zh';
+    var str1 = appid + query + salt + key;
+    var sign = MD5(str1);
+    $.ajax({
+        url: 'http://api.fanyi.baidu.com/api/trans/vip/translate',
+        type: 'get',
+        dataType: 'jsonp',
+        data: {
+            q: query,
+            appid: appid,
+            salt: salt,
+            from: from,
+            to: to,
+            sign: sign
+        },
+        success: function(data) {
+            sentencesCount++;
+            var htmlStr = '<h3 class="englishText">'+data.trans_result[0].src+'</h3>';
+            htmlStr += '<h4 class="chineseText">'+data.trans_result[0].dst+'</h4>';
+
+            $(".outputContainer").append(htmlStr);
+            if (sentencesCount != sentences.length) {
+                translate();
+            }
+        }
+    });
+}
+</script>
+
+</html>
